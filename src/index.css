@@ -1,0 +1,448 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+/* ============ Variables de diseño corporativo ============ */
+:root {
+  --bg-principal: #f5f7f5;
+  --bg-tarjeta: #ffffff;
+  --texto-principal: #0f1f1c;
+  --texto-secundario: #52655f;
+  --borde-fino: #dde4e1;
+  --color-primario: #0f766e;
+  --color-primario-hover: #0b5c55;
+  --color-exito: #0f766e;
+  --color-alerta: #b91c1c;
+
+  --fuente-titulo: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --fuente-cuerpo: 'IBM Plex Sans', 'Segoe UI', Roboto, sans-serif;
+  --fuente-datos: 'IBM Plex Mono', 'Courier New', monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--fuente-cuerpo);
+  background-color: var(--bg-principal);
+  color: var(--texto-principal);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--fuente-titulo);
+  letter-spacing: -0.01em;
+}
+
+/* ============ Header ============ */
+.header-clinico {
+  background-color: var(--bg-tarjeta);
+  border-bottom: 1px solid var(--borde-fino);
+  padding: 0.85rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(15, 31, 28, 0.04);
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-logo h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--texto-principal);
+}
+
+.header-logo p {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--texto-secundario);
+  font-family: var(--fuente-datos);
+  letter-spacing: 0.02em;
+}
+
+.header-sesion {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.header-usuario {
+  font-size: 0.78rem;
+  font-family: var(--fuente-datos);
+  color: var(--texto-secundario);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-salir {
+  background: none;
+  border: 1px solid var(--borde-fino);
+  color: var(--texto-secundario);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-salir:hover {
+  border-color: var(--color-alerta);
+  color: var(--color-alerta);
+  background-color: #fef2f2;
+}
+
+/* ============ Nav Tabs ============ */
+.contenedor-tabs {
+  background-color: #eef2f0;
+  padding: 0.25rem;
+  border-radius: 12px;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-tab {
+  background: none;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--texto-secundario);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--fuente-cuerpo);
+}
+
+.btn-tab.activo {
+  background-color: var(--bg-tarjeta);
+  color: var(--color-primario);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* ============ Contenedor de Ventanas ============ */
+.contenedor-principal {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+/* ============ Tarjetas ============ */
+.tarjeta-blanca {
+  background-color: var(--bg-tarjeta);
+  border: 1px solid var(--borde-fino);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  margin-bottom: 2rem;
+}
+
+.titulo-seccion {
+  font-size: 1rem;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--fuente-titulo);
+}
+
+.indicador-azul { width: 4px; height: 16px; background-color: var(--color-primario); border-radius: 2px; }
+.indicador-verde { width: 4px; height: 16px; background-color: var(--color-exito); border-radius: 2px; }
+
+/* ============ Formularios ============ */
+.grid-formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.25rem;
+}
+
+.col-completa { grid-column: 1 / -1; }
+
+.grupo-campo label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--texto-secundario);
+  margin-bottom: 0.4rem;
+}
+
+.input-fino {
+  width: 100%;
+  background-color: #f8faf9;
+  border: 1px solid var(--borde-fino);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.9rem;
+  font-family: var(--fuente-cuerpo);
+  color: var(--texto-principal);
+  transition: all 0.15s;
+}
+
+.input-fino:focus {
+  outline: none;
+  border-color: var(--color-primario);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+/* ============ Botones ============ */
+.btn-primario {
+  background-color: var(--color-primario);
+  color: #ffffff;
+  border: none;
+  padding: 0.7rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: var(--fuente-cuerpo);
+}
+
+.btn-primario:hover { background-color: var(--color-primario-hover); }
+.btn-primario:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-oscuro {
+  background-color: var(--texto-principal);
+  color: #ffffff;
+  border: none;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btn-oscuro:hover { background-color: #1e2f2a; }
+
+.btn-reporte {
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 8px;
+  cursor: pointer;
+  background: none;
+}
+.btn-excel { color: var(--color-exito); border: 1px solid #a7d9d3; background-color: #f0f9f8; }
+.btn-pdf { color: var(--color-alerta); border: 1px solid #fecdd3; background-color: #fff1f2; }
+
+/* ============ Tablas Clínicas ============ */
+.tabla-contenedor {
+  overflow-x: auto;
+  border: 1px solid var(--borde-fino);
+  border-radius: 12px;
+}
+
+.tabla-fina {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.tabla-fina th {
+  background-color: #f8faf9;
+  color: var(--texto-secundario);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--borde-fino);
+}
+
+.tabla-fina td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #f1f5f3;
+  font-family: var(--fuente-datos);
+  font-size: 0.85rem;
+}
+
+.tabla-fina tr:last-child td { border-bottom: none; }
+
+/* ============ Badges de Estado ============ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge-optimo { background-color: #f0f9f8; color: var(--color-exito); border: 1px solid #a7d9d3; }
+.badge-critico { background-color: #fff1f2; color: var(--color-alerta); border: 1px solid #fecdd3; }
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.badge-optimo .badge-dot { background-color: var(--color-exito); }
+.badge-critico .badge-dot { background-color: var(--color-alerta); }
+
+/* ============ Totales Inferiores ============ */
+.contenedor-totales {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  background-color: var(--bg-principal);
+  padding: 1.25rem;
+  border-top: 1px solid var(--borde-fino);
+}
+
+.tarjeta-total {
+  background: white;
+  border: 1px solid var(--borde-fino);
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.tarjeta-total p:first-child {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.tarjeta-total p:last-child {
+  margin: 0.25rem 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-family: var(--fuente-titulo);
+}
+
+/* ============ Pantalla de carga ============ */
+.pantalla-carga {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--texto-secundario);
+  font-family: var(--fuente-cuerpo);
+  font-size: 0.85rem;
+}
+
+.ecg-pulso {
+  width: 46px;
+  height: 46px;
+  border: 3px solid var(--borde-fino);
+  border-top-color: var(--color-primario);
+  border-radius: 50%;
+  animation: girar 0.8s linear infinite;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+/* ============ Pantalla de Login ============ */
+.pantalla-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-principal);
+  background-image:
+    radial-gradient(circle at 15% 15%, rgba(15, 118, 110, 0.06), transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(15, 118, 110, 0.05), transparent 40%);
+  padding: 1.5rem;
+}
+
+.tarjeta-login {
+  width: 100%;
+  max-width: 380px;
+  background-color: var(--bg-tarjeta);
+  border: 1px solid var(--borde-fino);
+  border-radius: 18px;
+  padding: 2.25rem 2rem 1.75rem;
+  box-shadow: 0 8px 30px rgba(15, 31, 28, 0.06);
+}
+
+.login-encabezado {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.login-icono {
+  font-size: 2.2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.login-encabezado h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.login-encabezado p {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.75rem;
+  color: var(--texto-secundario);
+  font-family: var(--fuente-datos);
+  letter-spacing: 0.02em;
+}
+
+.ecg-firma {
+  width: 100%;
+  height: 32px;
+  margin: 0.75rem 0 1.25rem;
+  opacity: 0.55;
+}
+
+.form-login {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.btn-login {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.login-error {
+  margin: -0.4rem 0 0 0;
+  font-size: 0.78rem;
+  color: var(--color-alerta);
+  background-color: #fef2f2;
+  border: 1px solid #fecdd3;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+}
+
+.login-pie {
+  text-align: center;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin: 1.5rem 0 0 0;
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 768px) {
+  .header-clinico {
+    flex-wrap: wrap;
+    padding: 0.85rem 1rem;
+  }
+  .header-sesion {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--borde-fino);
+  }
+}
