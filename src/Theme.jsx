@@ -15,7 +15,7 @@ export const THEME = {
 
   // --- Texto ---
   tinta: '#132420',         // casi negro con tinte verde-pino
-  tintaSecundaria: '#5C6D66',
+  tintaSecundaria:' #132420',
   tintaTenue: '#93A29C',
 
   // --- Marca / acciones ---
