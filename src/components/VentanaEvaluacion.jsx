@@ -19,6 +19,11 @@ export default function VentanaEvaluacion() {
   const [esMovil, setEsMovil] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
+  // --- Estado para edición de filas del historial ---
+  const [editandoId, setEditandoId] = useState(null);
+  const [edicion, setEdicion] = useState(null);
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
   useEffect(() => {
     obtenerMedicamentos();
     obtenerConsumos();
@@ -72,6 +77,93 @@ export default function VentanaEvaluacion() {
     await obtenerMedicamentos();
     await obtenerConsumos();
     setGuardando(false);
+  };
+
+  // --- Edición de una fila existente ---
+  const iniciarEdicion = (c) => {
+    setEditandoId(c.id);
+    setEdicion({
+      codigo: c.codigo || '',
+      medicamento_id: c.medicamento_id,
+      fecha: c.fecha || '',
+      unidades_utilizadas: c.unidades_utilizadas,
+      observacion: c.observacion || ''
+    });
+  };
+
+  const cancelarEdicion = () => {
+    setEditandoId(null);
+    setEdicion(null);
+  };
+
+  const manejarCambioMedicamentoEdicion = (id) => {
+    setEdicion(prev => ({ ...prev, medicamento_id: id }));
+  };
+
+  const guardarEdicion = async () => {
+    if (!edicion) return;
+    const unidadesNuevas = parseInt(edicion.unidades_utilizadas);
+    if (isNaN(unidadesNuevas) || unidadesNuevas <= 0) {
+      alert('Ingresa una cantidad válida');
+      return;
+    }
+
+    const consumoOriginal = consumos.find(c => c.id === editandoId);
+    const medNuevo = medicamentos.find(m => m.id?.toString() === edicion.medicamento_id?.toString());
+
+    if (!consumoOriginal || !medNuevo) {
+      alert('No se pudo identificar el registro o el medicamento seleccionado');
+      return;
+    }
+
+    setGuardandoEdicion(true);
+
+    const mismoMedicamento = consumoOriginal.medicamento_id?.toString() === edicion.medicamento_id?.toString();
+
+    if (mismoMedicamento) {
+      // Solo cambia la cantidad: ajustamos la diferencia contra el mismo medicamento
+      const diferencia = unidadesNuevas - consumoOriginal.unidades_utilizadas;
+      const existenciaResultante = medNuevo.existencia - diferencia;
+      if (existenciaResultante < 0) {
+        alert('Stock insuficiente para esta edición');
+        setGuardandoEdicion(false);
+        return;
+      }
+      await supabase.from('medicamentos').update({ existencia: existenciaResultante }).eq('id', medNuevo.id);
+    } else {
+      // Cambió el medicamento: devolvemos el stock al original y descontamos del nuevo
+      const medOriginal = medicamentos.find(m => m.id?.toString() === consumoOriginal.medicamento_id?.toString());
+      if (medOriginal) {
+        await supabase.from('medicamentos').update({ existencia: medOriginal.existencia + consumoOriginal.unidades_utilizadas }).eq('id', medOriginal.id);
+      }
+      if (medNuevo.existencia < unidadesNuevas) {
+        alert('Stock insuficiente en el medicamento seleccionado');
+        setGuardandoEdicion(false);
+        return;
+      }
+      await supabase.from('medicamentos').update({ existencia: medNuevo.existencia - unidadesNuevas }).eq('id', medNuevo.id);
+    }
+
+    const { error } = await supabase.from('consumos').update({
+      codigo: edicion.codigo,
+      medicamento_id: edicion.medicamento_id,
+      unidad_prestacion: medNuevo.unidad_prestacion,
+      fecha: edicion.fecha,
+      unidades_utilizadas: unidadesNuevas,
+      observacion: edicion.observacion
+    }).eq('id', editandoId);
+
+    if (error) {
+      alert('Error al actualizar: ' + error.message);
+      setGuardandoEdicion(false);
+      return;
+    }
+
+    setEditandoId(null);
+    setEdicion(null);
+    await obtenerMedicamentos();
+    await obtenerConsumos();
+    setGuardandoEdicion(false);
   };
 
   const consumosFiltrados = consumos.filter(c => {
@@ -158,7 +250,14 @@ export default function VentanaEvaluacion() {
     borderRadius: T.radioControl, border: `1px solid ${T.borde}`,
     fontSize: '0.9rem', fontFamily: T.fuenteCuerpo, color: T.tinta, backgroundColor: T.bgTarjeta
   };
+  const inputPequeno = { ...input, padding: '8px 10px', fontSize: '0.82rem' };
   const h2 = { fontSize: '1.05rem', fontWeight: 700, margin: 0, color: T.tinta, fontFamily: T.fuenteTitulo };
+
+  const botonAccion = (color) => ({
+    padding: '6px 10px', fontSize: '0.75rem', fontWeight: 700, border: 'none',
+    borderRadius: T.radioControl, cursor: 'pointer', color: '#fff', backgroundColor: color,
+    fontFamily: T.fuenteCuerpo, whiteSpace: 'nowrap'
+  });
 
   return (
     <div style={{
@@ -271,15 +370,40 @@ export default function VentanaEvaluacion() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {consumosFiltrados.map(c => (
                 <div key={c.id} style={{ padding: '14px', backgroundColor: T.bgSutil, borderRadius: '12px', border: `1px solid ${T.bordeSuave}`, borderLeft: `3px solid ${T.primario}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
-                    <span style={{ fontWeight: 700, color: T.primario, fontFamily: T.fuenteDatos, fontSize: '0.82rem', wordBreak: 'break-all' }}>{c.codigo || '—'}</span>
-                    <span style={{ color: T.tintaSecundaria, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>{c.fecha || '—'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: '0.9rem', gap: '8px' }}>
-                    <span style={{ color: T.tinta }}>{c.medicamentos?.nombre || 'N/A'}</span>
-                    <span style={{ color: T.acento, whiteSpace: 'nowrap', fontFamily: T.fuenteDatos }}>{c.unidades_utilizadas} u. ({c.unidad_prestacion})</span>
-                  </div>
-                  {c.observacion && <p style={{ margin: '8px 0 0 0', color: T.tintaSecundaria, fontSize: '0.78rem', fontStyle: 'italic' }}>Obs: {c.observacion}</p>}
+                  {editandoId === c.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <input type="text" value={edicion.codigo} onChange={e => setEdicion(prev => ({ ...prev, codigo: e.target.value }))} placeholder="Código" style={inputPequeno} />
+                      <select value={edicion.medicamento_id} onChange={e => manejarCambioMedicamentoEdicion(e.target.value)} style={inputPequeno}>
+                        {medicamentos.map(m => (
+                          <option key={m.id} value={m.id}>{m.nombre} ({m.existencia} u. disp.) [{m.unidad_prestacion}]</option>
+                        ))}
+                      </select>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <input type="date" value={edicion.fecha} onChange={e => setEdicion(prev => ({ ...prev, fecha: e.target.value }))} style={inputPequeno} />
+                        <input type="number" value={edicion.unidades_utilizadas} onChange={e => setEdicion(prev => ({ ...prev, unidades_utilizadas: e.target.value }))} style={inputPequeno} />
+                      </div>
+                      <textarea value={edicion.observacion} onChange={e => setEdicion(prev => ({ ...prev, observacion: e.target.value }))} placeholder="Observaciones" style={{ ...inputPequeno, minHeight: '45px', resize: 'vertical' }}></textarea>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={guardarEdicion} disabled={guardandoEdicion} style={{ ...botonAccion(T.primario), flex: 1 }}>
+                          {guardandoEdicion ? 'Guardando...' : 'Guardar'}
+                        </button>
+                        <button onClick={cancelarEdicion} style={{ ...botonAccion(T.tintaTenue), flex: 1 }}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                        <span style={{ fontWeight: 700, color: T.primario, fontFamily: T.fuenteDatos, fontSize: '0.82rem', wordBreak: 'break-all' }}>{c.codigo || '—'}</span>
+                        <span style={{ color: T.tintaSecundaria, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>{c.fecha || '—'}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: '0.9rem', gap: '8px' }}>
+                        <span style={{ color: T.tinta }}>{c.medicamentos?.nombre || 'N/A'}</span>
+                        <span style={{ color: T.acento, whiteSpace: 'nowrap', fontFamily: T.fuenteDatos }}>{c.unidades_utilizadas} u. ({c.unidad_prestacion})</span>
+                      </div>
+                      {c.observacion && <p style={{ margin: '8px 0 0 0', color: T.tintaSecundaria, fontSize: '0.78rem', fontStyle: 'italic' }}>Obs: {c.observacion}</p>}
+                      <button onClick={() => iniciarEdicion(c)} style={{ ...botonAccion(T.primario), marginTop: '10px', width: '100%' }}>✏️ Editar</button>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -292,16 +416,54 @@ export default function VentanaEvaluacion() {
                   <th style={{ padding: '13px 14px', color: '#fff', fontFamily: T.fuenteDatos, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Medicamento</th>
                   <th style={{ padding: '13px 14px', color: '#fff', fontFamily: T.fuenteDatos, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fecha</th>
                   <th style={{ padding: '13px 14px', color: '#fff', fontFamily: T.fuenteDatos, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Cantidad</th>
+                  <th style={{ padding: '13px 14px', color: '#fff', fontFamily: T.fuenteDatos, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {consumosFiltrados.map((c, i) => (
                   <tr key={c.id} style={{ borderBottom: `1px solid ${T.bordeSuave}`, fontSize: '0.92rem', backgroundColor: i % 2 === 0 ? T.bgTarjeta : T.bgSutil }}>
-                    <td style={{ padding: '13px 14px', fontFamily: T.fuenteDatos, fontWeight: 600, color: T.primario }}>{c.codigo || '—'}</td>
-                    <td style={{ padding: '13px 14px', color: T.tintaSecundaria }}>{c.unidad_prestacion || '—'}</td>
-                    <td style={{ padding: '13px 14px', fontWeight: 600, color: T.tinta }}>{c.medicamentos?.nombre || 'N/A'}</td>
-                    <td style={{ padding: '13px 14px', color: T.tintaSecundaria }}>{c.fecha || '—'}</td>
-                    <td style={{ padding: '13px 14px', textAlign: 'right', fontWeight: 700, color: T.acento, fontFamily: T.fuenteDatos }}>{c.unidades_utilizadas} u.</td>
+                    {editandoId === c.id ? (
+                      <>
+                        <td style={{ padding: '10px' }}>
+                          <input type="text" value={edicion.codigo} onChange={e => setEdicion(prev => ({ ...prev, codigo: e.target.value }))} style={inputPequeno} />
+                        </td>
+                        <td style={{ padding: '10px', color: T.tintaSecundaria, fontFamily: T.fuenteDatos, fontSize: '0.82rem' }}>
+                          {medicamentos.find(m => m.id?.toString() === edicion.medicamento_id?.toString())?.unidad_prestacion || '—'}
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          <select value={edicion.medicamento_id} onChange={e => manejarCambioMedicamentoEdicion(e.target.value)} style={inputPequeno}>
+                            {medicamentos.map(m => (
+                              <option key={m.id} value={m.id}>{m.nombre} ({m.existencia} u. disp.)</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          <input type="date" value={edicion.fecha} onChange={e => setEdicion(prev => ({ ...prev, fecha: e.target.value }))} style={inputPequeno} />
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          <input type="number" value={edicion.unidades_utilizadas} onChange={e => setEdicion(prev => ({ ...prev, unidades_utilizadas: e.target.value }))} style={{ ...inputPequeno, textAlign: 'right' }} />
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button onClick={guardarEdicion} disabled={guardandoEdicion} style={botonAccion(T.primario)}>
+                              {guardandoEdicion ? '...' : 'Guardar'}
+                            </button>
+                            <button onClick={cancelarEdicion} style={botonAccion(T.tintaTenue)}>Cancelar</button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={{ padding: '13px 14px', fontFamily: T.fuenteDatos, fontWeight: 600, color: T.primario }}>{c.codigo || '—'}</td>
+                        <td style={{ padding: '13px 14px', color: T.tintaSecundaria }}>{c.unidad_prestacion || '—'}</td>
+                        <td style={{ padding: '13px 14px', fontWeight: 600, color: T.tinta }}>{c.medicamentos?.nombre || 'N/A'}</td>
+                        <td style={{ padding: '13px 14px', color: T.tintaSecundaria }}>{c.fecha || '—'}</td>
+                        <td style={{ padding: '13px 14px', textAlign: 'right', fontWeight: 700, color: T.acento, fontFamily: T.fuenteDatos }}>{c.unidades_utilizadas} u.</td>
+                        <td style={{ padding: '13px 14px', textAlign: 'center' }}>
+                          <button onClick={() => iniciarEdicion(c)} style={botonAccion(T.primario)}>✏️ Editar</button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
