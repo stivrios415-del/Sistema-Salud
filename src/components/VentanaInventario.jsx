@@ -172,7 +172,9 @@ export default function VentanaInventario() {
                   <span style={{ color: medConsultado.existencia > 15 ? T.exito : T.alerta, fontWeight: 700, fontSize: '1.05rem', whiteSpace: 'nowrap', fontFamily: T.fuenteDatos }}>{medConsultado.existencia} u. disp.</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', paddingTop: '8px', borderTop: `1px solid ${T.bordeSuave}` }}>
-                  <span style={{ fontSize: '0.8rem', color: T.tintaSecundaria }}>Consumo acumulado</span>
+                <span style={{ fontSize: '0.8rem', color: T.tintaSecundaria, fontWeight: 'bold' }}>
+  Consumo acumulado
+</span>
                   <span style={{ color: T.acento, fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', fontFamily: T.fuenteDatos }}>{consumoDelSeleccionado} u.</span>
                 </div>
               </div>
