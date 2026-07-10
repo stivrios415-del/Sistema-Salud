@@ -4,7 +4,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import XLSX from 'xlsx-js-style';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { THEME as T, estiloSello } from '../theme';
+import { THEME as T, estiloSello } from '../Theme';
 
 export default function VentanaInventario() {
   const [nombreMed, setNombreMed] = useState('');
