@@ -42,7 +42,7 @@ function App() {
     <div>
       <header className="header-clinico">
         <div className="header-logo">
-          <span style={{ fontSize: '2rem' }}>🏥</span>
+          <span className="header-logo-icono">🏥</span>
           <div>
             <h1>Centro de Salud</h1>
             <p>Sistema de Control Clínico &amp; Stock</p>
