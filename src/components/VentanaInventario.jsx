@@ -19,6 +19,9 @@ export default function VentanaInventario() {
   const [cantidadAgregar, setCantidadAgregar] = useState('');
   const [restockeando, setRestockeando] = useState(false);
 
+  const [medicamentoResetId, setMedicamentoResetId] = useState('');
+  const [reseteando, setReseteando] = useState(false);
+
   useEffect(() => {
     cargarDatos();
     const verificarResolucion = () => setEsMovil(window.innerWidth < 768);
@@ -64,9 +67,40 @@ export default function VentanaInventario() {
     setRestockeando(false);
   };
 
+  const restablecerExistencias = async (e) => {
+    e.preventDefault();
+    const med = medicamentos.find(m => m.id?.toString() === medicamentoResetId?.toString());
+
+    if (!med) {
+      alert('Selecciona un medicamento para restablecer');
+      return;
+    }
+
+    const confirmar = window.confirm(
+      `¿Seguro que deseas poner en 0 las existencias de "${med.nombre}"? Esta acción se usa para iniciar un nuevo ingreso mensual y no se puede deshacer.`
+    );
+    if (!confirmar) return;
+
+    setReseteando(true);
+    const { error } = await supabase
+      .from('medicamentos')
+      .update({ existencia: 0 })
+      .eq('id', medicamentoResetId);
+
+    if (error) { alert('Error al restablecer existencias: ' + error.message); }
+    else { setMedicamentoResetId(''); await cargarDatos(); }
+    setReseteando(false);
+  };
+
   const medicamentosFiltrados = medicamentos.filter(m =>
     (m.nombre || '').toLowerCase().includes(busqueda.toLowerCase())
   );
+
+  const consumoTotalPorMedicamento = (medicamentoId) => {
+    return consumos
+      .filter(c => c.medicamento_id?.toString() === medicamentoId?.toString())
+      .reduce((acc, c) => acc + (Number(c.unidades_utilizadas) || 0), 0);
+  };
 
   const exportarExcel = () => {
     if (medicamentosFiltrados.length === 0) return;
@@ -90,19 +124,21 @@ export default function VentanaInventario() {
     const encabezados = [
       { v: "MEDICAMENTO", t: "s", s: estiloEncabezado },
       { v: "ESTADO DE ALERTA", t: "s", s: estiloEncabezado },
-      { v: "EXISTENCIA DISPONIBLE", t: "s", s: estiloEncabezado }
+      { v: "EXISTENCIA DISPONIBLE", t: "s", s: estiloEncabezado },
+      { v: "CONSUMO ACUMULADO", t: "s", s: estiloEncabezado }
     ];
 
     const filasDatos = medicamentosFiltrados.map(m => [
       { v: m.nombre || '', t: "s", s: estiloCelda },
       { v: m.existencia > 15 ? 'Existencias Óptimas' : 'Existencias Críticas', t: "s", s: { ...estiloCelda, alignment: { horizontal: "center" } } },
-      { v: `${m.existencia} u.`, t: "s", s: { ...estiloCelda, alignment: { horizontal: "right" }, font: { bold: true } } }
+      { v: `${m.existencia} u.`, t: "s", s: { ...estiloCelda, alignment: { horizontal: "right" }, font: { bold: true } } },
+      { v: `${consumoTotalPorMedicamento(m.id)} u.`, t: "s", s: { ...estiloCelda, alignment: { horizontal: "right" } } }
     ]);
 
     const hoja = XLSX.utils.aoa_to_sheet([encabezados, ...filasDatos]);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, 'INVENTARIO');
-    hoja['!cols'] = [{ wch: 32 }, { wch: 22 }, { wch: 25 }];
+    hoja['!cols'] = [{ wch: 32 }, { wch: 22 }, { wch: 25 }, { wch: 22 }];
     XLSX.writeFile(libro, `REPORTE_INVENTARIO_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -120,9 +156,7 @@ export default function VentanaInventario() {
   };
 
   const medConsultado = medicamentos.find(m => m.id?.toString() === medicamentoConsultaId?.toString());
-  const consumoDelSeleccionado = consumos
-    .filter(c => c.medicamento_id?.toString() === medicamentoConsultaId?.toString())
-    .reduce((acc, c) => acc + (Number(c.unidades_utilizadas) || 0), 0);
+  const consumoDelSeleccionado = consumoTotalPorMedicamento(medicamentoConsultaId);
 
   const datosGrafico = medicamentosFiltrados.map(m => ({
     name: (m.nombre || '').length > 15 ? m.nombre.substring(0, 15) + '...' : (m.nombre || ''),
@@ -217,6 +251,28 @@ export default function VentanaInventario() {
                   {restockeando ? 'Sumando...' : 'Agregar'}
                 </button>
               </div>
+            </form>
+          </div>
+
+          {/* RESTABLECER EXISTENCIAS (NUEVO INGRESO MENSUAL) */}
+          <div style={tarjeta}>
+            <span style={estiloSello(T.alerta)}>Reinicio Mensual</span>
+            <h2 style={{ ...h2, marginBottom: '6px' }}>Restablecer Existencias</h2>
+            <p style={{ margin: '0 0 14px 0', fontSize: '0.78rem', color: T.tintaTenue }}>
+              Pone en 0 las existencias del medicamento seleccionado. Útil al iniciar un nuevo ingreso mensual.
+            </p>
+            <form onSubmit={restablecerExistencias} style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', gap: '12px' }}>
+              <select value={medicamentoResetId} onChange={e => setMedicamentoResetId(e.target.value)} required
+                style={{ ...input, flex: esMovil ? 'none' : 2 }}>
+                <option value="">-- Seleccionar medicamento --</option>
+                {medicamentos.map(m => (
+                  <option key={m.id} value={m.id}>{m.nombre} ({m.existencia} u. actuales)</option>
+                ))}
+              </select>
+              <button type="submit" disabled={reseteando}
+                style={{ width: esMovil ? '100%' : 'auto', padding: '12px 20px', backgroundColor: reseteando ? T.tintaTenue : T.alerta, color: '#fff', border: 'none', borderRadius: T.radioControl, fontWeight: 600, cursor: reseteando ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', fontFamily: T.fuenteCuerpo }}>
+                {reseteando ? 'Restableciendo...' : 'Restablecer a 0'}
+              </button>
             </form>
           </div>
         </div>
