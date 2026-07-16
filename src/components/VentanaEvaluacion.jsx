@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -15,25 +15,49 @@ export default function VentanaEvaluacion() {
   const [observacion, setObservacion] = useState('');
   const [medicamentos, setMedicamentos] = useState([]);
   const [consumos, setConsumos] = useState([]);
+  
+  // --- Buscador para el Historial ---
   const [busqueda, setBusqueda] = useState('');
+  
+  // --- Buscador para el Formulario de Registro ---
+  const [busquedaMed, setBusquedaMed] = useState('');
+  const [mostrarDropdownMed, setMostrarDropdownMed] = useState(false);
+  const dropdownRef = useRef(null);
+  
+  // --- Filtros por fecha ---
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
+
   const [esMovil, setEsMovil] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
-  // --- Estado para edición de filas del historial ---
+  // --- Estado para edición ---
   const [editandoId, setEditandoId] = useState(null);
   const [edicion, setEdicion] = useState(null);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
-  // --- Estado para eliminación de filas del historial ---
+  // --- Estado para eliminación ---
   const [eliminandoId, setEliminandoId] = useState(null);
 
   useEffect(() => {
     obtenerMedicamentos();
     obtenerConsumos();
+    
+    const hacerClicFuera = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setMostrarDropdownMed(false);
+      }
+    };
+    document.addEventListener('mousedown', hacerClicFuera);
+
     const verificarResolucion = () => setEsMovil(window.innerWidth < 768);
     verificarResolucion();
     window.addEventListener('resize', verificarResolucion);
-    return () => window.removeEventListener('resize', verificarResolucion);
+    
+    return () => {
+      window.removeEventListener('resize', verificarResolucion);
+      document.removeEventListener('mousedown', hacerClicFuera);
+    };
   }, []);
 
   const obtenerMedicamentos = async () => {
@@ -50,10 +74,11 @@ export default function VentanaEvaluacion() {
     if (data) setConsumos(data);
   };
 
-  const manejarCambioMedicamento = (id) => {
-    setMedicamentoId(id);
-    const medSeleccionado = medicamentos.find(m => m.id?.toString() === id.toString());
-    setUnidadPrest(medSeleccionado ? (medSeleccionado.unidad_prestacion || 'TAB') : 'TAB');
+  const seleccionarMedicamento = (med) => {
+    setMedicamentoId(med.id);
+    setBusquedaMed(med.nombre);
+    setUnidadPrest(med.unidad_prestacion || 'TAB');
+    setMostrarDropdownMed(false);
   };
 
   const manejarGuardar = async (e) => {
@@ -62,7 +87,7 @@ export default function VentanaEvaluacion() {
     const med = medicamentos.find(m => m.id?.toString() === medicamentoId?.toString());
 
     if (!med || med.existencia < unidadesUtilizadas) {
-      alert('Stock insuficiente');
+      alert('Stock insuficiente o fármaco no seleccionado correctamente.');
       return;
     }
 
@@ -76,13 +101,18 @@ export default function VentanaEvaluacion() {
 
     await supabase.from('medicamentos').update({ existencia: med.existencia - unidadesUtilizadas }).eq('id', medicamentoId);
 
-    setCodigo(''); setUnidades(''); setObservacion(''); setMedicamentoId(''); setUnidadPrest('TAB');
+    setCodigo(''); 
+    setUnidades(''); 
+    setObservacion(''); 
+    setMedicamentoId(''); 
+    setBusquedaMed('');
+    setUnidadPrest('TAB');
+    
     await obtenerMedicamentos();
     await obtenerConsumos();
     setGuardando(false);
   };
 
-  // --- Edición de una fila existente ---
   const iniciarEdicion = (c) => {
     setEditandoId(c.id);
     setEdicion({
@@ -124,7 +154,6 @@ export default function VentanaEvaluacion() {
     const mismoMedicamento = consumoOriginal.medicamento_id?.toString() === edicion.medicamento_id?.toString();
 
     if (mismoMedicamento) {
-      // Solo cambia la cantidad: ajustamos la diferencia contra el mismo medicamento
       const diferencia = unidadesNuevas - consumoOriginal.unidades_utilizadas;
       const existenciaResultante = medNuevo.existencia - diferencia;
       if (existenciaResultante < 0) {
@@ -134,7 +163,6 @@ export default function VentanaEvaluacion() {
       }
       await supabase.from('medicamentos').update({ existencia: existenciaResultante }).eq('id', medNuevo.id);
     } else {
-      // Cambió el medicamento: devolvemos el stock al original y descontamos del nuevo
       const medOriginal = medicamentos.find(m => m.id?.toString() === consumoOriginal.medicamento_id?.toString());
       if (medOriginal) {
         await supabase.from('medicamentos').update({ existencia: medOriginal.existencia + consumoOriginal.unidades_utilizadas }).eq('id', medOriginal.id);
@@ -169,10 +197,9 @@ export default function VentanaEvaluacion() {
     setGuardandoEdicion(false);
   };
 
-  // --- Eliminación de una fila del historial ---
   const eliminarConsumo = async (c) => {
     const confirmar = window.confirm(
-      `¿Eliminar el registro de "${c.medicamentos?.nombre || 'este medicamento'}" (${c.unidades_utilizadas} u.)? Las unidades se devolverán al inventario. Esta acción no se puede deshacer.`
+      `¿Eliminar el registro de "${c.medicamentos?.nombre || 'este medicamento'}" (${c.unidades_utilizadas} u.)?`
     );
     if (!confirmar) return;
 
@@ -180,37 +207,40 @@ export default function VentanaEvaluacion() {
 
     const med = medicamentos.find(m => m.id?.toString() === c.medicamento_id?.toString());
     if (med) {
-      const { error: errorStock } = await supabase
-        .from('medicamentos')
-        .update({ existencia: med.existencia + (Number(c.unidades_utilizadas) || 0) })
-        .eq('id', med.id);
-      if (errorStock) {
-        alert('Error al devolver el stock: ' + errorStock.message);
-        setEliminandoId(null);
-        return;
-      }
+      await supabase.from('medicamentos').update({ existencia: med.existencia + (Number(c.unidades_utilizadas) || 0) }).eq('id', med.id);
     }
 
-    const { error } = await supabase.from('consumos').delete().eq('id', c.id);
-
-    if (error) {
-      alert('Error al eliminar el registro: ' + error.message);
-      setEliminandoId(null);
-      return;
-    }
-
-    if (editandoId === c.id) { setEditandoId(null); setEdicion(null); }
+    await supabase.from('consumos').delete().eq('id', c.id);
     await obtenerMedicamentos();
     await obtenerConsumos();
     setEliminandoId(null);
   };
 
+  // --- Filtrado del Historial ---
   const consumosFiltrados = consumos.filter(c => {
     const texto = busqueda.toLowerCase();
     const codigoTxt = (c.codigo || '').toLowerCase();
     const nombreTxt = (c.medicamentos?.nombre || '').toLowerCase();
-    return codigoTxt.includes(texto) || nombreTxt.includes(texto);
+    const cumpleTexto = codigoTxt.includes(texto) || nombreTxt.includes(texto);
+    
+    let cumpleFecha = true;
+    if (c.fecha) {
+      if (fechaInicio && c.fecha < fechaInicio) cumpleFecha = false;
+      if (fechaFin && c.fecha > fechaFin) cumpleFecha = false;
+    } else if (fechaInicio || fechaFin) {
+      cumpleFecha = false;
+    }
+    return cumpleTexto && cumpleFecha;
   });
+
+  const medicamentosFiltradosForm = medicamentos.filter(m => 
+    m.nombre.toLowerCase().includes(busquedaMed.toLowerCase())
+  );
+
+  const limpiarFiltrosFecha = () => {
+    setFechaInicio('');
+    setFechaFin('');
+  };
 
   const exportarExcelConsumos = () => {
     if (consumosFiltrados.length === 0) return;
@@ -264,18 +294,19 @@ export default function VentanaEvaluacion() {
     doc.save('Reporte_Consumos.pdf');
   };
 
+  // --- CORREGIDO: Valor inicial {} para evitar error al reducir arrays vacíos ---
   const consumosPorFecha = consumosFiltrados.reduce((acc, c) => {
     const fechaCortada = c.fecha ? c.fecha.substring(5, 10) : 'N/A';
     acc[fechaCortada] = (acc[fechaCortada] || 0) + (Number(c.unidades_utilizadas) || 0);
     return acc;
-  }, {});
+  }, {}); 
 
   const datosGraficoLinea = Object.keys(consumosPorFecha).sort().map(fecha => ({
     Fecha: fecha,
     Unidades: consumosPorFecha[fecha]
   }));
 
-  // --- Estilos reutilizables derivados del tema ---
+  // --- Estilos ---
   const tarjeta = {
     backgroundColor: T.bgTarjeta,
     padding: esMovil ? '18px 16px' : '22px',
@@ -290,7 +321,7 @@ export default function VentanaEvaluacion() {
     fontSize: '0.9rem', fontFamily: T.fuenteCuerpo, color: T.tinta, backgroundColor: T.bgTarjeta
   };
   const inputPequeno = { ...input, padding: '8px 10px', fontSize: '0.82rem' };
-  const h2 = { fontSize: '1.05rem', fontWeight: 700, margin: 0, color: T.tinta, fontFamily: T.fuenteTitulo };
+  const h2 = { fontSize: '1.25rem', fontWeight: 700, margin: 0, color: T.tinta, fontFamily: T.fuenteTitulo };
 
   const botonAccion = (color) => ({
     padding: '6px 10px', fontSize: '0.75rem', fontWeight: 700, border: 'none',
@@ -309,41 +340,137 @@ export default function VentanaEvaluacion() {
 
       <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '1fr 1fr', gap: esMovil ? '14px' : '20px', marginBottom: esMovil ? '14px' : '20px' }}>
 
-        {/* FORMULARIO */}
-        <div style={tarjeta}>
-          <span style={estiloSello(T.primario)}>Ficha · Evaluación</span>
-          <h2 style={{ ...h2, marginBottom: '16px' }}>Registro de Evaluación</h2>
-          <form onSubmit={manejarGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '1fr 1fr', gap: '12px' }}>
-              <input type="text" value={codigo} onChange={e => setCodigo(e.target.value)} placeholder="Código Manual" required style={input} />
-              <input type="text" value={unidadPrest} disabled placeholder="U. Prestación"
-                style={{ ...input, backgroundColor: T.primarioSuave, color: T.primario, fontWeight: 700, fontFamily: T.fuenteDatos, border: `1px solid ${T.primarioSuave}` }} />
+        {/* REGISTRO DE EVALUACIÓN */}
+        <div style={{ ...tarjeta, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <span style={{ ...estiloSello(T.primario), marginBottom: '12px', fontSize: '0.65rem', letterSpacing: '0.08em', padding: '4px 10px', borderRadius: '6px' }}>
+            FICHA • EVALUACIÓN
+          </span>
+          
+          <h2 style={{ ...h2, marginBottom: '20px', fontSize: '1.2rem' }}>
+            Registro de Evaluación
+          </h2>
+          
+          <form onSubmit={manejarGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
+              <input 
+                type="text" 
+                value={codigo} 
+                onChange={e => setCodigo(e.target.value)} 
+                placeholder="Código Manual" 
+                required 
+                style={input} 
+              />
+              <input 
+                type="text" 
+                value={unidadPrest} 
+                disabled 
+                placeholder="TAB"
+                style={{ ...input, backgroundColor: '#e6f0ed', color: '#1a433a', fontWeight: 'bold', textAlign: 'center', border: 'none' }} 
+              />
             </div>
 
-            <select value={medicamentoId} onChange={e => manejarCambioMedicamento(e.target.value)} required style={input}>
-              <option value="">Seleccione fármaco...</option>
-              {medicamentos.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre} ({m.existencia} u. disp.) [{m.unidad_prestacion}]
-                </option>
-              ))}
-            </select>
+            {/* BUSCADOR INTERACTIVO DE FÁRMACOS */}
+            <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+              <input 
+                type="text"
+                placeholder="🔍 Escribe para buscar fármaco..."
+                value={busquedaMed}
+                onChange={(e) => {
+                  setBusquedaMed(e.target.value);
+                  setMostrarDropdownMed(true);
+                  if(e.target.value === '') setMedicamentoId('');
+                }}
+                onFocus={() => setMostrarDropdownMed(true)}
+                required
+                style={{ ...input, paddingRight: '36px' }}
+              />
+              <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: T.tintaTenue, fontSize: '0.8rem' }}>
+                ▼
+              </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '1fr 1fr', gap: '12px' }}>
-              <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} required style={input} />
-              <input type="number" value={unidades} onChange={e => setUnidades(e.target.value)} placeholder="Cantidad" required style={input} />
+              {mostrarDropdownMed && (
+                <ul style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0,
+                  backgroundColor: '#fff', border: `1px solid ${T.borde}`,
+                  borderRadius: T.radioControl, boxShadow: '0px 8px 16px rgba(0,0,0,0.1)',
+                  maxHeight: '200px', overflowY: 'auto', margin: '4px 0 0 0',
+                  padding: '4px 0', listStyle: 'none', zIndex: 10,
+                  boxSizing: 'border-box'
+                }}>
+                  {medicamentosFiltradosForm.length === 0 ? (
+                    <li style={{ padding: '10px 14px', color: T.tintaTenue, fontSize: '0.85rem' }}>
+                      No se encontraron fármacos
+                    </li>
+                  ) : (
+                    medicamentosFiltradosForm.map(m => (
+                      <li 
+                        key={m.id}
+                        onClick={() => seleccionarMedicamento(m)}
+                        style={{
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          fontSize: '0.88rem',
+                          color: T.tinta,
+                          backgroundColor: medicamentoId === m.id ? '#f0f7f4' : 'transparent',
+                          transition: 'background-color 0.1s'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f4fbf8'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = medicamentoId === m.id ? '#f0f7f4' : 'transparent'}
+                      >
+                        <div style={{ fontWeight: 600 }}>{m.nombre}</div>
+                        <div style={{ fontSize: '0.75rem', color: T.tintaTenue }}>
+                          Existencia: {m.existencia} u. | Unidad: {m.unidad_prestacion || 'TAB'}
+                        </div>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </div>
 
-            <textarea value={observacion} onChange={e => setObservacion(e.target.value)} placeholder="Observaciones facultativas..."
-              style={{ ...input, minHeight: '55px', fontFamily: T.fuenteCuerpo, resize: 'vertical' }}></textarea>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '12px' }}>
+              <input 
+                type="date" 
+                value={fecha} 
+                onChange={e => setFecha(e.target.value)} 
+                required 
+                style={input} 
+              />
+              <input 
+                type="number" 
+                value={unidades} 
+                onChange={e => setUnidades(e.target.value)} 
+                placeholder="Cantidad" 
+                required 
+                style={input} 
+              />
+            </div>
 
-            <button type="submit" disabled={guardando}
+            <textarea 
+              value={observacion} 
+              onChange={e => setObservacion(e.target.value)} 
+              placeholder="Observaciones facultativas..."
+              style={{ ...input, minHeight: '65px', resize: 'vertical' }}
+            />
+
+            <button 
+              type="submit" 
+              disabled={guardando}
               style={{
-                padding: '14px', backgroundColor: guardando ? T.tintaTenue : T.primario, color: '#fff',
-                border: 'none', borderRadius: T.radioControl, fontWeight: 700, fontSize: '0.95rem',
-                cursor: guardando ? 'not-allowed' : 'pointer', fontFamily: T.fuenteCuerpo,
-                letterSpacing: '0.01em', transition: 'background-color 0.15s'
-              }}>
+                padding: '14px', 
+                backgroundColor: guardando ? T.tintaTenue : '#1f5d4f', 
+                color: '#fff',
+                border: 'none', 
+                borderRadius: T.radioControl, 
+                fontWeight: 700, 
+                fontSize: '0.95rem',
+                cursor: guardando ? 'not-allowed' : 'pointer', 
+                fontFamily: T.fuenteCuerpo,
+                marginTop: '6px',
+                transition: 'background-color 0.15s'
+              }}
+            >
               {guardando ? 'Guardando...' : 'Guardar Entrada'}
             </button>
           </form>
@@ -383,19 +510,40 @@ export default function VentanaEvaluacion() {
 
       {/* HISTORIAL */}
       <div style={tarjeta}>
-        <div style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', justifyContent: 'space-between', alignItems: esMovil ? 'stretch' : 'flex-start', gap: '14px', marginBottom: '16px' }}>
-          <div>
-            <span style={estiloSello(T.primario)}>Historial</span>
-            <h2 style={h2}>
-              Salidas Clínicas {consumosFiltrados.length > 0 && <span style={{ color: T.tintaTenue, fontWeight: 500, fontSize: '0.8rem', fontFamily: T.fuenteCuerpo }}>({consumosFiltrados.length})</span>}
-            </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '16px' }}>
+          
+          <div style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', justifyContent: 'space-between', alignItems: esMovil ? 'stretch' : 'center', gap: '14px' }}>
+            <div>
+              <span style={estiloSello(T.primario)}>Historial</span>
+              <h2 style={h2}>
+                Salidas Clínicas {consumosFiltrados.length > 0 && <span style={{ color: T.tintaTenue, fontWeight: 500, fontSize: '0.8rem', fontFamily: T.fuenteCuerpo }}>({consumosFiltrados.length})</span>}
+              </h2>
+            </div>
+
+            {/* FILTROS DE FECHA */}
+            <div style={{ display: 'flex', gap: '8px', flexDirection: esMovil ? 'column' : 'row', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: T.tintaTenue, whiteSpace: 'nowrap' }}>Desde:</span>
+                <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} style={inputPequeno} />
+              </div>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: T.tintaTenue, whiteSpace: 'nowrap' }}>Hasta:</span>
+                <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} style={inputPequeno} />
+              </div>
+              {(fechaInicio || fechaFin) && (
+                <button onClick={limpiarFiltrosFecha} style={{ ...botonAccion(T.alerta), padding: '8px 12px', fontSize: '0.8rem' }}>
+                  Limpiar Fechas
+                </button>
+              )}
+            </div>
           </div>
+
           <div style={{ display: 'flex', gap: '10px', flexDirection: esMovil ? 'column' : 'row' }}>
-            <input type="text" placeholder="Buscar por código o fármaco..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
-              style={{ ...input, minWidth: esMovil ? 'auto' : '260px', padding: '11px 14px', fontSize: '0.88rem' }} />
-            <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-              <button onClick={exportarExcelConsumos} style={{ flex: 1, padding: '11px 14px', backgroundColor: T.bgTarjeta, border: `1px solid ${T.borde}`, borderRadius: T.radioControl, fontWeight: 600, fontSize: '0.85rem', color: T.primario, cursor: 'pointer' }}>📊 Excel</button>
-              <button onClick={exportarPDFConsumos} style={{ flex: 1, padding: '11px 14px', backgroundColor: T.bgTarjeta, border: `1px solid ${T.borde}`, borderRadius: T.radioControl, fontWeight: 600, fontSize: '0.85rem', color: T.alerta, cursor: 'pointer' }}>📄 PDF</button>
+            <input type="text" placeholder="Buscar por código o fármaco en el historial..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              style={{ ...input, minWidth: esMovil ? 'auto' : '260px', padding: '11px 14px', fontSize: '0.88rem', flex: 1 }} />
+            <div style={{ display: 'flex', gap: '10px', width: esMovil ? '100%' : 'auto' }}>
+              <button onClick={exportarExcelConsumos} style={{ flex: 1, padding: '11px 14px', backgroundColor: T.bgTarjeta, border: `1px solid ${T.borde}`, borderRadius: T.radioControl, fontWeight: 600, fontSize: '0.85rem', color: T.primario, cursor: 'pointer', whiteSpace: 'nowrap' }}>📊 Excel</button>
+              <button onClick={exportarPDFConsumos} style={{ flex: 1, padding: '11px 14px', backgroundColor: T.bgTarjeta, border: `1px solid ${T.borde}`, borderRadius: T.radioControl, fontWeight: 600, fontSize: '0.85rem', color: T.alerta, cursor: 'pointer', whiteSpace: 'nowrap' }}>📄 PDF</button>
             </div>
           </div>
         </div>
