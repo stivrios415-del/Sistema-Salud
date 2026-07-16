@@ -24,6 +24,9 @@ export default function VentanaEvaluacion() {
   const [edicion, setEdicion] = useState(null);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
+  // --- Estado para eliminación de filas del historial ---
+  const [eliminandoId, setEliminandoId] = useState(null);
+
   useEffect(() => {
     obtenerMedicamentos();
     obtenerConsumos();
@@ -164,6 +167,42 @@ export default function VentanaEvaluacion() {
     await obtenerMedicamentos();
     await obtenerConsumos();
     setGuardandoEdicion(false);
+  };
+
+  // --- Eliminación de una fila del historial ---
+  const eliminarConsumo = async (c) => {
+    const confirmar = window.confirm(
+      `¿Eliminar el registro de "${c.medicamentos?.nombre || 'este medicamento'}" (${c.unidades_utilizadas} u.)? Las unidades se devolverán al inventario. Esta acción no se puede deshacer.`
+    );
+    if (!confirmar) return;
+
+    setEliminandoId(c.id);
+
+    const med = medicamentos.find(m => m.id?.toString() === c.medicamento_id?.toString());
+    if (med) {
+      const { error: errorStock } = await supabase
+        .from('medicamentos')
+        .update({ existencia: med.existencia + (Number(c.unidades_utilizadas) || 0) })
+        .eq('id', med.id);
+      if (errorStock) {
+        alert('Error al devolver el stock: ' + errorStock.message);
+        setEliminandoId(null);
+        return;
+      }
+    }
+
+    const { error } = await supabase.from('consumos').delete().eq('id', c.id);
+
+    if (error) {
+      alert('Error al eliminar el registro: ' + error.message);
+      setEliminandoId(null);
+      return;
+    }
+
+    if (editandoId === c.id) { setEditandoId(null); setEdicion(null); }
+    await obtenerMedicamentos();
+    await obtenerConsumos();
+    setEliminandoId(null);
   };
 
   const consumosFiltrados = consumos.filter(c => {
@@ -401,7 +440,12 @@ export default function VentanaEvaluacion() {
                         <span style={{ color: T.acento, whiteSpace: 'nowrap', fontFamily: T.fuenteDatos }}>{c.unidades_utilizadas} u. ({c.unidad_prestacion})</span>
                       </div>
                       {c.observacion && <p style={{ margin: '8px 0 0 0', color: T.tintaSecundaria, fontSize: '0.78rem', fontStyle: 'italic' }}>Obs: {c.observacion}</p>}
-                      <button onClick={() => iniciarEdicion(c)} style={{ ...botonAccion(T.primario), marginTop: '10px', width: '100%' }}>✏️ Editar</button>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                        <button onClick={() => iniciarEdicion(c)} style={{ ...botonAccion(T.primario), flex: 1 }}>✏️ Editar</button>
+                        <button onClick={() => eliminarConsumo(c)} disabled={eliminandoId === c.id} style={{ ...botonAccion(T.alerta), flex: 1 }}>
+                          {eliminandoId === c.id ? 'Eliminando...' : '🗑️ Eliminar'}
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>
@@ -460,7 +504,12 @@ export default function VentanaEvaluacion() {
                         <td style={{ padding: '13px 14px', color: T.tintaSecundaria }}>{c.fecha || '—'}</td>
                         <td style={{ padding: '13px 14px', textAlign: 'right', fontWeight: 700, color: T.acento, fontFamily: T.fuenteDatos }}>{c.unidades_utilizadas} u.</td>
                         <td style={{ padding: '13px 14px', textAlign: 'center' }}>
-                          <button onClick={() => iniciarEdicion(c)} style={botonAccion(T.primario)}>✏️ Editar</button>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button onClick={() => iniciarEdicion(c)} style={botonAccion(T.primario)}>✏️ Editar</button>
+                            <button onClick={() => eliminarConsumo(c)} disabled={eliminandoId === c.id} style={botonAccion(T.alerta)}>
+                              {eliminandoId === c.id ? '...' : '🗑️ Eliminar'}
+                            </button>
+                          </div>
                         </td>
                       </>
                     )}
