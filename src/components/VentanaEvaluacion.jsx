@@ -93,7 +93,7 @@ export default function VentanaEvaluacion() {
 
     setGuardando(true);
     const { error } = await supabase.from('consumos').insert([{
-      codigo, unidad_prestacion: unidadPrest, medicamento_id: medicamentoId,
+      codigo: codigo || null, unidad_prestacion: unidadPrest, medicamento_id: medicamentoId,
       fecha, unidades_utilizadas: unidadesUtilizadas, observacion
     }]);
 
@@ -353,14 +353,14 @@ export default function VentanaEvaluacion() {
           <form onSubmit={manejarGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
-              <input 
-                type="text" 
-                value={codigo} 
-                onChange={e => setCodigo(e.target.value)} 
-                placeholder="Código Manual" 
-                required 
-                style={input} 
-              />
+             <input 
+  type="text" 
+  value={codigo} 
+  onChange={e => setCodigo(e.target.value)} 
+  placeholder="Código Manual (Opcional)" 
+  style={input} 
+/>
+
               <input 
                 type="text" 
                 value={unidadPrest} 
