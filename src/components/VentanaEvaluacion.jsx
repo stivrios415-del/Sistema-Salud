@@ -86,18 +86,37 @@ export default function VentanaEvaluacion() {
     const unidadesUtilizadas = parseInt(unidades);
     const med = medicamentos.find(m => m.id?.toString() === medicamentoId?.toString());
 
-    if (!med || med.existencia < unidadesUtilizadas) {
-      alert('Stock insuficiente o fármaco no seleccionado correctamente.');
+    if (!medicamentoId || !med) {
+      alert('Debes seleccionar un fármaco válido de la lista.');
+      return;
+    }
+
+    if (isNaN(unidadesUtilizadas) || unidadesUtilizadas <= 0) {
+      alert('Ingresa una cantidad válida.');
+      return;
+    }
+
+    if (med.existencia < unidadesUtilizadas) {
+      alert('Stock insuficiente para registrar esta salida.');
       return;
     }
 
     setGuardando(true);
+
     const { error } = await supabase.from('consumos').insert([{
-      codigo: codigo || null, unidad_prestacion: unidadPrest, medicamento_id: medicamentoId,
-      fecha, unidades_utilizadas: unidadesUtilizadas, observacion
+      codigo: codigo || null, 
+      unidad_prestacion: unidadPrest, 
+      medicamento_id: medicamentoId,
+      fecha, 
+      unidades_utilizadas: unidadesUtilizadas, 
+      observacion
     }]);
 
-    if (error) { alert('Error al guardar: ' + error.message); setGuardando(false); return; }
+    if (error) { 
+      alert('Error al guardar: ' + error.message); 
+      setGuardando(false); 
+      return; 
+    }
 
     await supabase.from('medicamentos').update({ existencia: med.existencia - unidadesUtilizadas }).eq('id', medicamentoId);
 
@@ -294,7 +313,6 @@ export default function VentanaEvaluacion() {
     doc.save('Reporte_Consumos.pdf');
   };
 
-  // --- CORREGIDO: Valor inicial {} para evitar error al reducir arrays vacíos ---
   const consumosPorFecha = consumosFiltrados.reduce((acc, c) => {
     const fechaCortada = c.fecha ? c.fecha.substring(5, 10) : 'N/A';
     acc[fechaCortada] = (acc[fechaCortada] || 0) + (Number(c.unidades_utilizadas) || 0);
@@ -353,13 +371,13 @@ export default function VentanaEvaluacion() {
           <form onSubmit={manejarGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
-             <input 
-  type="text" 
-  value={codigo} 
-  onChange={e => setCodigo(e.target.value)} 
-  placeholder="Código Manual (Opcional)" 
-  style={input} 
-/>
+              <input 
+                type="text" 
+                value={codigo} 
+                onChange={e => setCodigo(e.target.value)} 
+                placeholder="Código Manual (Opcional)" 
+                style={input} 
+              />
 
               <input 
                 type="text" 
@@ -650,7 +668,7 @@ export default function VentanaEvaluacion() {
                         <td style={{ padding: '13px 14px', color: T.tintaSecundaria }}>{c.unidad_prestacion || '—'}</td>
                         <td style={{ padding: '13px 14px', fontWeight: 600, color: T.tinta }}>{c.medicamentos?.nombre || 'N/A'}</td>
                         <td style={{ padding: '13px 14px', color: T.tintaSecundaria }}>{c.fecha || '—'}</td>
-                        <td style={{ padding: '13px 14px', textAlign: 'right', fontWeight: 700, color: T.acento, fontFamily: T.fuenteDatos }}>{c.unidades_utilizadas} u.</td>
+                        <td style={{ padding: '13px 14px', color: T.acento, fontWeight: 700, fontFamily: T.fuenteDatos, textAlign: 'right' }}>{c.unidades_utilizadas} u.</td>
                         <td style={{ padding: '13px 14px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                             <button onClick={() => iniciarEdicion(c)} style={botonAccion(T.primario)}>✏️ Editar</button>
@@ -668,6 +686,7 @@ export default function VentanaEvaluacion() {
           )}
         </div>
       </div>
+
     </div>
   );
 }
